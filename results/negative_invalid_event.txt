@@ -1,0 +1,2 @@
+Scenario parse error at line 2: unknown event 'BAD_EVENT'
+Could not parse scenario file: scenarios/invalid_event_case.txt

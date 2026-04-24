@@ -1,0 +1,3 @@
+[A] Destination D, next hop B
+[B] Forwarding message from A to D, next hop D
+[D] Received message from A: hello_from_A_to_D

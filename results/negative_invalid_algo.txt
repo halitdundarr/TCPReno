@@ -1,0 +1,5 @@
+Invalid algorithm: bogus (allowed: reno|tahoe)
+Usage:
+  ./tcp_sim --algo reno|tahoe --scenario <path>
+  ./tcp_sim --topology-demo <src> <dst> <message>
+  ./tcp_sim --node <A|B|C|D|E|F> [--topology-dir <path>]

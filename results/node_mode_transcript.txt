@@ -1,0 +1,19 @@
+--- A ---
+[A] Node started on port 5001. Use: send <DEST> <MESSAGE>
+[A] Destination D, next hop B
+[A] Forwarding message from F to E, next hop B
+--- B ---
+[B] Node started on port 5002. Use: send <DEST> <MESSAGE>
+[B] Forwarding message from A to D, next hop D
+[B] Forwarding message from F to E, next hop E
+--- C ---
+[C] Node started on port 5003. Use: send <DEST> <MESSAGE>
+--- D ---
+[D] Node started on port 5004. Use: send <DEST> <MESSAGE>
+[D] Received message from A: hello_from_A_to_D
+--- E ---
+[E] Node started on port 5005. Use: send <DEST> <MESSAGE>
+[E] Received message from F: hello_from_F_to_E
+--- F ---
+[F] Node started on port 5006. Use: send <DEST> <MESSAGE>
+[F] Destination E, next hop A
