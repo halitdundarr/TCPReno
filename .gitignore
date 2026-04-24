@@ -15,3 +15,6 @@ tcp_sim
 
 # Logs
 *.log
+
+# Assignment PDF
+*.pdf
