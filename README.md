@@ -69,8 +69,8 @@ Each node process reads its UDP port from the `PORT <number>` line inside the co
 `.conf` file and forwards packets according to the routing entries in that same file.
 
 ## Implemented Requirements
-- Single executable simulation (`tcp_sim`)
-- Separate assignment-style node executable (`node`)
+- TCP congestion simulation executable (`tcp_sim`)
+- Assignment-style node executable for topology mode (`node`)
 - Sender-side `cwnd` and `ssthresh` modeling
 - Configurable packet events through scenario files
 - Timeout and triple-duplicate ACK demonstrations
@@ -88,6 +88,7 @@ What `make test` validates:
 - Tahoe timeout and triple-duplicate ACK outputs
 - Negative case for invalid algorithm
 - Negative case for invalid event type in scenario
+- Node wrapper config resolution for `./node A.conf`
 
 ## Limitations
 - Implemented algorithms are `TCP Reno` and `TCP Tahoe` only (no `NewReno` behavior yet).
@@ -102,7 +103,8 @@ What `make test` validates:
 - Regression output files in `results/` are the baseline evidence for reproducible behavior.
 
 ## Requirement to Evidence Map
-- **Single executable:** `Makefile` builds only `tcp_sim`
+- **TCP simulation executable:** `Makefile` builds `tcp_sim`
+- **Assignment-style node executable:** `Makefile` builds `node`
 - **Core sender structures:** `src/tcp_state.h`, `src/tcp_state.c`
 - **Reno/Tahoe behavior:** `src/tcp_reno.c`, `src/tcp_tahoe.c`
 - **Configurable loss + scenarios:** `scenarios/timeout_case.txt`, `scenarios/triple_dup_case.txt`, `scenarios/mixed_case.txt`
