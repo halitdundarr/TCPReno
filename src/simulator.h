@@ -22,6 +22,7 @@ int run_forwarding_demo(
     char destination,
     const char *message
 );
+int preview_node_process(const char *topology_dir, char node_name);
 int run_node_process(const char *topology_dir, char node_name);
 
 #endif

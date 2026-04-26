@@ -3,6 +3,7 @@
 
 # Build artifacts
 tcp_sim
+node
 *.o
 *.out
 *.a
@@ -18,3 +19,4 @@ tcp_sim
 
 # Assignment PDF
 *.pdf
+assignment.md

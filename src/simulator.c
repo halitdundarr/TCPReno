@@ -227,7 +227,6 @@ static int send_packet_to_port(int sockfd, int port, const char *packet) {
 
 int load_topology(const char *topology_dir, NodeConfig *nodes, int *node_count) {
     const char all_nodes[] = {'A', 'B', 'C', 'D', 'E', 'F'};
-    int ports[] = {5001, 5002, 5003, 5004, 5005, 5006};
     int i;
 
     *node_count = 0;
@@ -235,21 +234,32 @@ int load_topology(const char *topology_dir, NodeConfig *nodes, int *node_count) 
         char path[256];
         FILE *file;
         NodeConfig *cfg;
+        int port_found = 0;
         snprintf(path, sizeof(path), "%s/%c.conf", topology_dir, all_nodes[i]);
         file = fopen(path, "r");
         if (!file) return -1;
 
         cfg = &nodes[*node_count];
         cfg->node = all_nodes[i];
-        cfg->port = ports[i];
+        cfg->port = 0;
         cfg->route_count = 0;
 
         while (!feof(file) && cfg->route_count < MAX_ROUTES) {
             char line[MAX_LINE];
             RouteEntry entry;
             char next_hop_str[8];
+            int port = 0;
             if (!fgets(line, sizeof(line), file)) break;
             if (line[0] == '#' || strlen(line) < 5) continue;
+            if (sscanf(line, " PORT %d", &port) == 1) {
+                if (port <= 0) {
+                    fclose(file);
+                    return -1;
+                }
+                cfg->port = port;
+                port_found = 1;
+                continue;
+            }
             if (sscanf(
                     line,
                     " %c %7s %d %63[^\n]",
@@ -264,6 +274,9 @@ int load_topology(const char *topology_dir, NodeConfig *nodes, int *node_count) 
         }
 
         fclose(file);
+        if (!port_found) {
+            return -1;
+        }
         (*node_count)++;
     }
     return 0;
@@ -310,6 +323,43 @@ int run_forwarding_demo(
     return -1;
 }
 
+static int load_node_runtime(
+    const char *topology_dir,
+    char node_name,
+    NodeConfig *nodes,
+    int *node_count,
+    const NodeConfig **self_cfg
+) {
+    if (load_topology(topology_dir, nodes, node_count) != 0) {
+        fprintf(stderr, "Failed to load topology configs from %s\n", topology_dir);
+        return -1;
+    }
+
+    node_name = (char)toupper((unsigned char)node_name);
+    *self_cfg = find_node_const(nodes, *node_count, node_name);
+    if (!*self_cfg) {
+        fprintf(stderr, "Node %c not found in topology.\n", node_name);
+        return -1;
+    }
+
+    return 0;
+}
+
+int preview_node_process(const char *topology_dir, char node_name) {
+    NodeConfig nodes[NODE_COUNT];
+    int node_count = 0;
+    const NodeConfig *self_cfg;
+    char normalized_node = (char)toupper((unsigned char)node_name);
+
+    if (load_node_runtime(topology_dir, normalized_node, nodes, &node_count, &self_cfg) != 0) {
+        return -1;
+    }
+
+    printf("[%c] Node started on port %d. Use: send <DEST> <MESSAGE>\n", normalized_node, self_cfg->port);
+    fflush(stdout);
+    return 0;
+}
+
 int run_node_process(const char *topology_dir, char node_name) {
     NodeConfig nodes[NODE_COUNT];
     int node_count = 0;
@@ -317,16 +367,9 @@ int run_node_process(const char *topology_dir, char node_name) {
     int my_port;
     int sockfd;
     struct sockaddr_in bind_addr;
+    char normalized_node = (char)toupper((unsigned char)node_name);
 
-    if (load_topology(topology_dir, nodes, &node_count) != 0) {
-        fprintf(stderr, "Failed to load topology configs from %s\n", topology_dir);
-        return -1;
-    }
-
-    node_name = (char)toupper((unsigned char)node_name);
-    self_cfg = find_node_const(nodes, node_count, node_name);
-    if (!self_cfg) {
-        fprintf(stderr, "Node %c not found in topology.\n", node_name);
+    if (load_node_runtime(topology_dir, normalized_node, nodes, &node_count, &self_cfg) != 0) {
         return -1;
     }
     my_port = self_cfg->port;
@@ -348,7 +391,7 @@ int run_node_process(const char *topology_dir, char node_name) {
         return -1;
     }
 
-    printf("[%c] Node started on port %d. Use: send <DEST> <MESSAGE>\n", node_name, my_port);
+    printf("[%c] Node started on port %d. Use: send <DEST> <MESSAGE>\n", normalized_node, my_port);
     fflush(stdout);
 
     for (;;) {
@@ -377,24 +420,24 @@ int run_node_process(const char *topology_dir, char node_name) {
             if (sscanf(line, "%15s", command) != 1) continue;
             if (strcmp(command, "quit") == 0 || strcmp(command, "exit") == 0) break;
             if (sscanf(line, "send %c %399[^\n]", &dest, message) != 2) {
-                fprintf(stderr, "[%c] Invalid command. Use: send <DEST> <MESSAGE>\n", node_name);
+                fprintf(stderr, "[%c] Invalid command. Use: send <DEST> <MESSAGE>\n", normalized_node);
                 continue;
             }
 
             dest = (char)toupper((unsigned char)dest);
             route = find_route(self_cfg, dest);
             if (!route || route->next_hop == '-') {
-                fprintf(stderr, "[%c] No route to %c\n", node_name, dest);
+                fprintf(stderr, "[%c] No route to %c\n", normalized_node, dest);
                 continue;
             }
             next_port = port_for_node(nodes, node_count, route->next_hop);
             if (next_port < 0) {
-                fprintf(stderr, "[%c] Unknown next hop %c\n", node_name, route->next_hop);
+                fprintf(stderr, "[%c] Unknown next hop %c\n", normalized_node, route->next_hop);
                 continue;
             }
 
-            printf("[%c] Destination %c, next hop %c\n", node_name, dest, route->next_hop);
-            snprintf(packet, sizeof(packet), "%c|%c|%s", node_name, dest, message);
+            printf("[%c] Destination %c, next hop %c\n", normalized_node, dest, route->next_hop);
+            snprintf(packet, sizeof(packet), "%c|%c|%s", normalized_node, dest, message);
             if (send_packet_to_port(sockfd, next_port, packet) < 0) {
                 perror("sendto");
             }
@@ -414,24 +457,24 @@ int run_node_process(const char *topology_dir, char node_name) {
                 packet[n] = '\0';
                 if (parse_packet(packet, &src, &dst, msg, sizeof(msg)) != 0) continue;
 
-                if (node_name == dst) {
-                    printf("[%c] Received message from %c: %s\n", node_name, src, msg);
+                if (normalized_node == dst) {
+                    printf("[%c] Received message from %c: %s\n", normalized_node, src, msg);
                     fflush(stdout);
                     continue;
                 }
 
                 route = find_route(self_cfg, dst);
                 if (!route || route->next_hop == '-') {
-                    fprintf(stderr, "[%c] Dropping packet for %c (no route)\n", node_name, dst);
+                    fprintf(stderr, "[%c] Dropping packet for %c (no route)\n", normalized_node, dst);
                     continue;
                 }
                 next_port = port_for_node(nodes, node_count, route->next_hop);
                 if (next_port < 0) {
-                    fprintf(stderr, "[%c] Dropping packet for %c (bad next hop)\n", node_name, dst);
+                    fprintf(stderr, "[%c] Dropping packet for %c (bad next hop)\n", normalized_node, dst);
                     continue;
                 }
 
-                printf("[%c] Forwarding message from %c to %c, next hop %c\n", node_name, src, dst, route->next_hop);
+                printf("[%c] Forwarding message from %c to %c, next hop %c\n", normalized_node, src, dst, route->next_hop);
                 if (send_packet_to_port(sockfd, next_port, packet) < 0) perror("sendto");
                 fflush(stdout);
             }
